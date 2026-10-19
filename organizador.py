@@ -1,4 +1,5 @@
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +47,15 @@ def descobrir_categoria(item):
     return None
 
 
+def modificado_recentemente(item, segundos):
+    """Diz se o arquivo foi modificado nos últimos 'segundos' segundos (ou se sumiu)."""
+    try:
+        idade = time.time() - item.stat().st_mtime
+    except OSError:
+        return True
+    return idade < segundos
+
+
 def registrar_movimento(caminho_log, origem, destino):
     """Anota no log uma linha com a origem e o destino de um arquivo movido."""
     with open(caminho_log, "a", encoding="utf-8") as arquivo:
@@ -62,6 +72,12 @@ def registrar_execucao(texto):
 parser = argparse.ArgumentParser(description="Organiza os arquivos de uma pasta por tipo.")
 parser.add_argument("--pasta", help="Pasta a organizar. Sem isso, o programa pergunta.")
 parser.add_argument("--executar", action="store_true", help="Move de verdade. Sem isso, só simula.")
+parser.add_argument(
+    "--aguardar",
+    type=int,
+    default=0,
+    help="Ignora arquivos modificados nos últimos N segundos (evita mexer em downloads em andamento).",
+)
 args = parser.parse_args()
 
 automatico = args.pasta is not None
@@ -95,6 +111,7 @@ if not simulacao:
 
 movidos = 0
 ignorados = 0
+recentes = 0
 erros = 0
 
 for item in list(pasta.iterdir()):
@@ -103,6 +120,8 @@ for item in list(pasta.iterdir()):
 
         if categoria is None:
             ignorados += 1
+        elif modificado_recentemente(item, args.aguardar):
+            recentes += 1
         else:
             destino = pasta / categoria
             novo_caminho = caminho_livre(destino, item)
@@ -123,9 +142,9 @@ for item in list(pasta.iterdir()):
                     erros += 1
 
 if simulacao:
-    print(f"\nResumo (simulação): {movidos} seriam movidos, {ignorados} ignorados.")
+    print(f"\nResumo (simulação): {movidos} seriam movidos, {ignorados} ignorados, {recentes} recentes.")
 else:
-    print(f"\nResumo: {movidos} movidos, {ignorados} ignorados, {erros} com erro.")
+    print(f"\nResumo: {movidos} movidos, {ignorados} ignorados, {recentes} recentes, {erros} com erro.")
     if movidos > 0:
         print("Log salvo em:", caminho_log)
 
@@ -133,4 +152,6 @@ if automatico:
     modo = "real"
     if simulacao:
         modo = "simulação"
-    registrar_execucao(f"[{modo}] {pasta} | {movidos} movidos, {ignorados} ignorados, {erros} com erro")
+    registrar_execucao(
+        f"[{modo}] {pasta} | {movidos} movidos, {ignorados} ignorados, {recentes} recentes, {erros} com erro"
+    )
