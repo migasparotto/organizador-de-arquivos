@@ -1,6 +1,8 @@
 from datetime import datetime
 from pathlib import Path
 
+# Categorias: nome da pasta -> extensões que vão para ela.
+# Para criar uma categoria nova, basta adicionar uma linha aqui.
 CATEGORIAS = {
     "Videos": [".mp4", ".mkv", ".avi", ".mov"],
     "Fotos": [".png", ".jpg", ".jpeg"],
@@ -8,8 +10,12 @@ CATEGORIAS = {
     "Instaladores": [".exe", ".msi", ".iso"],
 }
 
+# Instaladores com alguma dessas palavras no nome vão para a pasta Games.
+PALAVRAS_JOGOS = ["steam", "epic", "game", "jogo", "battle.net", "launcher"]
+
 
 def caminho_livre(destino, item):
+    """Devolve um caminho que ainda não existe no destino (foto (1).png, foto (2).png...)."""
     caminho = destino / item.name
     contador = 1
     while caminho.exists():
@@ -18,14 +24,29 @@ def caminho_livre(destino, item):
     return caminho
 
 
-def descobrir_categoria(extensao):
-    for nome, extensoes in CATEGORIAS.items():
+def parece_jogo(nome_arquivo):
+    """Diz se o nome do arquivo tem alguma palavra de PALAVRAS_JOGOS."""
+    for palavra in PALAVRAS_JOGOS:
+        if palavra in nome_arquivo:
+            return True
+    return False
+
+
+def descobrir_categoria(item):
+    """Devolve o nome da categoria do arquivo, ou None se ele não tiver uma."""
+    extensao = item.suffix.lower()
+    nome_arquivo = item.name.lower()
+
+    for categoria, extensoes in CATEGORIAS.items():
         if extensao in extensoes:
-            return nome
+            if categoria == "Instaladores" and parece_jogo(nome_arquivo):
+                return "Games"
+            return categoria
     return None
 
 
 def registrar_movimento(caminho_log, origem, destino):
+    """Anota no log uma linha com a origem e o destino de um arquivo movido."""
     with open(caminho_log, "a", encoding="utf-8") as arquivo:
         arquivo.write(f"{origem}\t{destino}\n")
 
@@ -52,10 +73,11 @@ if not simulacao:
 
 movidos = 0
 ignorados = 0
+erros = 0
 
 for item in list(pasta.iterdir()):
     if item.is_file():
-        categoria = descobrir_categoria(item.suffix.lower())
+        categoria = descobrir_categoria(item)
 
         if categoria is None:
             ignorados += 1
@@ -65,18 +87,22 @@ for item in list(pasta.iterdir()):
 
             if simulacao:
                 print("[SIMULAÇÃO] Moveria:", item.name, "->", novo_caminho.relative_to(pasta))
+                movidos += 1
             else:
-                origem_absoluta = item.resolve()
-                destino.mkdir(exist_ok=True)
-                item.rename(novo_caminho)
-                registrar_movimento(caminho_log, origem_absoluta, novo_caminho.resolve())
-                print("Movido:", item.name, "->", novo_caminho.relative_to(pasta))
-
-            movidos += 1
+                try:
+                    origem_absoluta = item.resolve()
+                    destino.mkdir(exist_ok=True)
+                    item.rename(novo_caminho)
+                    registrar_movimento(caminho_log, origem_absoluta, novo_caminho.resolve())
+                    print("Movido:", item.name, "->", novo_caminho.relative_to(pasta))
+                    movidos += 1
+                except OSError as erro:
+                    print("ERRO ao mover", item.name, "->", erro)
+                    erros += 1
 
 if simulacao:
     print(f"\nResumo (simulação): {movidos} seriam movidos, {ignorados} ignorados.")
 else:
-    print(f"\nResumo: {movidos} movidos, {ignorados} ignorados.")
+    print(f"\nResumo: {movidos} movidos, {ignorados} ignorados, {erros} com erro.")
     if movidos > 0:
         print("Log salvo em:", caminho_log)
