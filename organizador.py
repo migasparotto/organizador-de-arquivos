@@ -16,6 +16,11 @@ CATEGORIAS = {
 # Instaladores com alguma dessas palavras no nome vão para a pasta Games.
 PALAVRAS_JOGOS = ["steam", "epic", "game", "jogo", "battle.net", "launcher"]
 
+# Categorias que o modo automático (--pasta) não move, porque costumam estar em uso
+# (instalador rodando, ISO montada). No modo com perguntas elas são organizadas normalmente.
+# Para o automático voltar a organizá-las, deixe a lista vazia: []
+CATEGORIAS_SO_MANUAL = ["Instaladores", "Games"]
+
 # Arquivo onde o programa guarda o que já viu em rodadas anteriores (quarentena).
 ARQUIVO_VISTOS = "vistos.json"
 
@@ -178,6 +183,7 @@ hora_atual = time.time()
 
 movidos = 0
 ignorados = 0
+so_manual = 0
 recentes = 0
 em_quarentena = 0
 erros = 0
@@ -188,6 +194,8 @@ for item in list(pasta.iterdir()):
 
         if categoria is None:
             ignorados += 1
+        elif automatico and categoria in CATEGORIAS_SO_MANUAL:
+            so_manual += 1
         elif modificado_recentemente(item, args.aguardar):
             recentes += 1
         elif usar_quarentena and not liberado_da_quarentena(
@@ -219,12 +227,12 @@ if usar_quarentena and not simulacao:
 if simulacao:
     print(
         f"\nResumo (simulação): {movidos} seriam movidos, {ignorados} ignorados, "
-        f"{recentes} recentes, {em_quarentena} em quarentena."
+        f"{so_manual} só no manual, {recentes} recentes, {em_quarentena} em quarentena."
     )
 else:
     print(
-        f"\nResumo: {movidos} movidos, {ignorados} ignorados, {recentes} recentes, "
-        f"{em_quarentena} em quarentena, {erros} com erro."
+        f"\nResumo: {movidos} movidos, {ignorados} ignorados, {so_manual} só no manual, "
+        f"{recentes} recentes, {em_quarentena} em quarentena, {erros} com erro."
     )
     if movidos > 0:
         print("Log salvo em:", caminho_log)
@@ -234,6 +242,6 @@ if automatico:
     if simulacao:
         modo = "simulação"
     registrar_execucao(
-        f"[{modo}] {pasta} | {movidos} movidos, {ignorados} ignorados, {recentes} recentes, "
-        f"{em_quarentena} em quarentena, {erros} com erro"
+        f"[{modo}] {pasta} | {movidos} movidos, {ignorados} ignorados, {so_manual} só no manual, "
+        f"{recentes} recentes, {em_quarentena} em quarentena, {erros} com erro"
     )
