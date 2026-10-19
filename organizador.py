@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -51,19 +52,40 @@ def registrar_movimento(caminho_log, origem, destino):
         arquivo.write(f"{origem}\t{destino}\n")
 
 
-entrada = input("Qual pasta organizar? (Enter para pasta_teste): ")
+def registrar_execucao(texto):
+    """Anota no arquivo execucoes.txt uma linha com a data e o resumo de uma execução automática."""
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open("execucoes.txt", "a", encoding="utf-8") as arquivo:
+        arquivo.write(f"{agora}  {texto}\n")
 
-if entrada == "":
-    pasta = Path("pasta_teste")
+
+parser = argparse.ArgumentParser(description="Organiza os arquivos de uma pasta por tipo.")
+parser.add_argument("--pasta", help="Pasta a organizar. Sem isso, o programa pergunta.")
+parser.add_argument("--executar", action="store_true", help="Move de verdade. Sem isso, só simula.")
+args = parser.parse_args()
+
+automatico = args.pasta is not None
+
+if automatico:
+    pasta = Path(args.pasta).expanduser()
 else:
-    pasta = Path(entrada).expanduser()
+    entrada = input("Qual pasta organizar? (Enter para pasta_teste): ")
+    if entrada == "":
+        pasta = Path("pasta_teste")
+    else:
+        pasta = Path(entrada).expanduser()
 
 if not pasta.is_dir():
     print("Pasta não encontrada:", pasta)
+    if automatico:
+        registrar_execucao(f"ERRO: pasta não encontrada: {pasta}")
     exit()
 
-resposta = input("Modo simulação, só mostra sem mover? (S/n): ")
-simulacao = resposta.lower() != "n"
+if automatico:
+    simulacao = not args.executar
+else:
+    resposta = input("Modo simulação, só mostra sem mover? (S/n): ")
+    simulacao = resposta.lower() != "n"
 
 agora = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 caminho_log = Path("logs") / f"{agora}.txt"
@@ -106,3 +128,9 @@ else:
     print(f"\nResumo: {movidos} movidos, {ignorados} ignorados, {erros} com erro.")
     if movidos > 0:
         print("Log salvo em:", caminho_log)
+
+if automatico:
+    modo = "real"
+    if simulacao:
+        modo = "simulação"
+    registrar_execucao(f"[{modo}] {pasta} | {movidos} movidos, {ignorados} ignorados, {erros} com erro")
